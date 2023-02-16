@@ -2,7 +2,7 @@ import { Readable } from "node:stream";
 import { ReadableStream } from "node:stream/web";
 import { createWriteStream } from "node:fs";
 import path from "node:path";
-import { mkdir } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import dayjs from "dayjs";
 import { TwitterApi } from "twitter-api-v2";
 import "dotenv/config";
@@ -41,6 +41,7 @@ async function main() {
   }
 
   const dir = targetUserId;
+  await rm(dir, { recursive: true, force: true });
   await mkdir(dir, { recursive: true });
 
   const client = new TwitterApi({
@@ -75,14 +76,18 @@ async function main() {
           const url = m.media_url_https;
           const [, , , ext] = url.split(".");
           const name = `${prefix}_${i}.${ext}`;
-          return downloadMedia(url, path.join(dir, name));
+
+          const highQualityMediaUrl =
+            url.replace(/\.\w+$/, "") + `?format=${ext}&name=4096x4096`;
+
+          return downloadMedia(highQualityMediaUrl, path.join(dir, name));
         } else {
           // video
-          let bitrate = 0;
+          let highestBitrate = 0;
           let url: undefined | string = undefined;
 
           for (const v of m.video_info.variants) {
-            if (v.bitrate > bitrate) {
+            if (v.bitrate > highestBitrate) {
               url = v.url;
             }
           }
